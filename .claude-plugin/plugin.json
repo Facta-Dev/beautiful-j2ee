@@ -1,0 +1,32 @@
+{
+  "name": "beautiful-j2ee",
+  "version": "0.1.0",
+  "description": "Write, review, port, and enforce idiomatic Java enterprise backends on J2EE / Jakarta EE 11: three skills distilled from the Jakarta EE specification, the Jakarta/MicroProfile guides, and the facta J2EE handbook, plus a drop-in Checkstyle config.",
+  "license": "MIT",
+  "author": {
+    "name": "Facta-Dev",
+    "url": "https://github.com/Facta-Dev"
+  },
+  "homepage": "https://github.com/Facta-Dev/beautiful-j2ee",
+  "repository": "https://github.com/Facta-Dev/beautiful-j2ee",
+  "keywords": [
+    "cdi",
+    "checkstyle",
+    "hibernate",
+    "jakarta-ee",
+    "java",
+    "java-21",
+    "jax-rs",
+    "jms",
+    "jpa",
+    "jta",
+    "maven",
+    "porting",
+    "skill"
+  ],
+  "skills": [
+    "./skills/j2ee-best-practices",
+    "./skills/j2ee-port",
+    "./skills/j2ee-review"
+  ]
+}

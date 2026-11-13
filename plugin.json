@@ -1,0 +1,58 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "beautiful-j2ee",
+  "version": "0.1.0",
+  "description": "Write, review, port, and enforce idiomatic Java enterprise backends on J2EE / Jakarta EE 11: three skills distilled from the Jakarta EE specification, the Jakarta/MicroProfile guides, and the facta J2EE handbook, plus a drop-in Checkstyle config.",
+  "author": {
+    "name": "Facta-Dev",
+    "url": "https://github.com/Facta-Dev"
+  },
+  "homepage": "https://github.com/Facta-Dev/beautiful-j2ee",
+  "repository": "https://github.com/Facta-Dev/beautiful-j2ee",
+  "license": "MIT",
+  "keywords": [
+    "cdi",
+    "checkstyle",
+    "hibernate",
+    "jakarta-ee",
+    "java",
+    "java-21",
+    "jax-rs",
+    "jms",
+    "jpa",
+    "jta",
+    "maven",
+    "porting",
+    "skill"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Beautiful J2EE",
+        "shortDescription": "Write, review, port J2EE apps",
+        "longDescription": "Three skills for Java enterprise developers on J2EE / Jakarta EE 11, distilled from the Jakarta EE specification, the Jakarta and MicroProfile guides, and the facta J2EE handbook.\n\nj2ee-best-practices guides new backend code: Maven modules that enforce the domain/application/adapters/presentation layers, CDI constructor injection, JTA use-case transactions, JPA/Hibernate with optimistic locking, schema-level tenant isolation with PostgreSQL RLS, the transactional outbox and JMS, JAX-RS with DTOs and the platform error envelope, Jakarta Security and MicroProfile config/observability, and app-server deployment.\n\nj2ee-review reviews a resource, use case, JPA adapter, module graph, outbox/JMS path, migration, security/tenant change, or diff and returns a prioritized report. Architecture and transaction/tenant contracts rank above everything. Every finding cites a file and line, the rule it breaks, and the smallest fix.\n\nj2ee-port ports Spring Boot, Java EE 8 (javax.*), EJB/JSF or a legacy servlet app to Jakarta EE 11 with the same behavior. It ports the original tests first and writes a PORTING.md.\n\nThe skills contain instructions and reference text only. They make no network calls and collect no data. When a JDK/Maven toolchain is available, the skills run Maven, Checkstyle, SpotBugs and the test suite; without one, they work from the code alone. A drop-in Checkstyle config is available in the GitHub repository.",
+        "developerName": "Facta-Dev",
+        "category": "Developer Tools",
+        "capabilities": [
+          "Write idiomatic Jakarta EE backends",
+          "Review J2EE code with cited rules",
+          "Port Spring or Java EE 8 to Jakarta EE 11"
+        ],
+        "websiteURL": "https://github.com/Facta-Dev/beautiful-j2ee",
+        "supportURL": "https://github.com/Facta-Dev/beautiful-j2ee/issues",
+        "privacyPolicyURL": "https://github.com/Facta-Dev/beautiful-j2ee/blob/main/PRIVACY.md",
+        "defaultPrompt": [
+          "Review this JAX-RS resource and list what to fix first",
+          "Port this Spring service to Jakarta EE CDI",
+          "Check the tenant isolation and transaction boundary"
+        ],
+        "brandColor": "#ED8B00",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/icon.png"
+      },
+      "publication": {
+        "release_notes": "Initial release: three J2EE skills, the module and tenant-isolation contract, and a proven Checkstyle config."
+      }
+    }
+  }
+}

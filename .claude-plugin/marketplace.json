@@ -1,0 +1,15 @@
+{
+  "name": "beautiful-j2ee",
+  "owner": {
+    "name": "Facta-Dev",
+    "url": "https://github.com/Facta-Dev"
+  },
+  "description": "Skills for writing beautiful, testable Java enterprise backends with Claude.",
+  "plugins": [
+    {
+      "name": "beautiful-j2ee",
+      "source": "./",
+      "description": "Skills that teach Claude to write, review, and port idiomatic J2EE / Jakarta EE backends, with the module and tenant-isolation contract and a proven Checkstyle config."
+    }
+  ]
+}
