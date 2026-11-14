@@ -24,6 +24,21 @@ teach coding agents to write, review, port, and enforce idiomatic
 They work with Claude Code, OpenAI Codex, GitHub Copilot, Cursor, Gemini CLI,
 and any other agent that reads the Agent Skills format.
 
+## The playbooks
+
+These skills are the runnable, machine-checked enforcement of the
+[facta playbooks](https://github.com/Facta-Dev/ai-coding-playbook). That
+repository carries the sixteen root playbooks — backend, Java/J2EE, frontend,
+React Native, Android/Kotlin, iOS/Swift, desktop Qt, CLI, Chrome extension,
+URLs, tests, security, audit, install, REA and the Claude Code kit — plus the
+nine runnable kits (Go, Rust, Node.js, Python, Java, extension, desktop,
+frontend-mobile, mobile-android), the model-routing guide and the
+instruction-budget tooling. Start with
+[`PLAYBOOK_JAVA_J2EE.md`](https://github.com/Facta-Dev/ai-coding-playbook/blob/main/PLAYBOOK_JAVA_J2EE.md)
+for this stack, then use this repository as the worked example. The shared
+contracts (`PLAYBOOK_URLS.md`, `PLAYBOOK_TESTS.md`, `PLAYBOOK_SECURITY.md`,
+`PLAYBOOK_AUDIT.md`, `PLAYBOOK_CLAUDE_CODE.md`) apply across the series.
+
 ## Why
 
 Java enterprise backends fail in ways a unit test alone does not catch:
