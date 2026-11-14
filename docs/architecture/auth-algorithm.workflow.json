@@ -1,0 +1,170 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "beautiful-j2ee — Auth / trust algorithm",
+    "quality_profile": "showcase",
+    "output": "auth-algorithm.workflow.html"
+  },
+  "lanes": [
+    { "id": "client", "label": "Client" },
+    { "id": "security", "label": "Jakarta Security" },
+    { "id": "api", "label": "apps/api" },
+    { "id": "usecase", "label": "Use case" },
+    { "id": "db", "label": "PostgreSQL" }
+  ],
+  "phases": [
+    { "id": "validate", "label": "Validate", "fromCol": 0, "toCol": 1 },
+    { "id": "authorize", "label": "Authorize", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "commit", "label": "Commit + audit", "fromCol": 4, "toCol": 5 }
+  ],
+  "mainPath": [
+    "req",
+    "validate",
+    "tenant",
+    "perm",
+    "rls",
+    "write",
+    "audit"
+  ],
+  "nodes": [
+    {
+      "id": "req",
+      "lane": "client",
+      "col": 0,
+      "type": "frontend",
+      "label": "Request",
+      "sublabel": "POST /widgets/{id}/archive"
+    },
+    {
+      "id": "validate",
+      "lane": "security",
+      "col": 1,
+      "type": "security",
+      "label": "Validate token",
+      "sublabel": "MP JWT · JWKS · exp/iss/aud"
+    },
+    {
+      "id": "tenant",
+      "lane": "api",
+      "col": 2,
+      "type": "backend",
+      "label": "Tenant claim",
+      "sublabel": "from the validated token"
+    },
+    {
+      "id": "perm",
+      "lane": "usecase",
+      "col": 3,
+      "type": "security",
+      "label": "Permission + ownership",
+      "sublabel": "in the use case"
+    },
+    {
+      "id": "rls",
+      "lane": "db",
+      "col": 3,
+      "type": "database",
+      "label": "tenant_id + RLS",
+      "sublabel": "app.tenant_id per tx"
+    },
+    {
+      "id": "write",
+      "lane": "db",
+      "col": 4,
+      "type": "database",
+      "label": "Domain write",
+      "sublabel": "widgets · @Version"
+    },
+    {
+      "id": "audit",
+      "lane": "db",
+      "col": 5,
+      "type": "database",
+      "label": "Audit row",
+      "sublabel": "admin actions · correlationId"
+    },
+    {
+      "id": "denied",
+      "lane": "api",
+      "col": 4,
+      "type": "security",
+      "label": "403 FORBIDDEN",
+      "sublabel": "error envelope"
+    }
+  ],
+  "edges": [
+    {
+      "id": "a1",
+      "from": "req",
+      "to": "validate",
+      "label": "Authorization: Bearer"
+    },
+    {
+      "id": "a2",
+      "from": "validate",
+      "to": "tenant",
+      "label": "validated claims"
+    },
+    {
+      "id": "a3",
+      "from": "tenant",
+      "to": "perm",
+      "label": "tenant scope"
+    },
+    {
+      "id": "a4",
+      "from": "perm",
+      "to": "rls",
+      "label": "tenant predicate"
+    },
+    {
+      "id": "a5",
+      "from": "rls",
+      "to": "write",
+      "label": "row visible"
+    },
+    {
+      "id": "a6",
+      "from": "write",
+      "to": "audit",
+      "label": "audit row"
+    },
+    {
+      "id": "a7",
+      "from": "perm",
+      "to": "denied",
+      "label": "not permitted",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Identity is a claim, not a URL",
+      "items": [
+        "the tenant comes from the validated token or the job payload — never from a query string and never from an unverified header",
+        "@RolesAllowed and the container realm shape the UX; they are not tenant isolation. The use case decides identity, tenant, permission and ownership",
+        "the database is the second line: tenant_id NOT NULL plus row-level security with a non-bypass application role"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The template gap to close",
+      "items": [
+        "the worked example's WidgetResource still derives the tenant from security.getUserPrincipal().getName() with a \"public\" fallback, and says so in a comment",
+        "replace it with the validated JWT tenant claim in your product — j2ee-review treats an unverified tenant as a Must-fix finding, not a note",
+        "the same shape applies to a job: the payload carries tenantId and correlationId, and the consumer reads the tenant from there"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "The failure shape",
+      "items": [
+        "one ExceptionMapper per family: an invalid token answers 401, AppError.forbidden answers 403 with requiredPermission, a missing row answers 404",
+        "a version mismatch is a typed conflict (409), never a 500; OptimisticLockException maps to conflict, and the exception never crosses the API",
+        "the envelope is { \"error\": { code, message, requiredPermission, correlationId } } — a stack trace, SQL text or an internal id never leaves the server"
+      ]
+    }
+  ]
+}

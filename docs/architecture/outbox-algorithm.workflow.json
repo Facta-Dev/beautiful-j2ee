@@ -1,0 +1,177 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "beautiful-j2ee — Transactional outbox algorithm",
+    "quality_profile": "showcase",
+    "output": "outbox-algorithm.workflow.html"
+  },
+  "lanes": [
+    { "id": "producers", "label": "Producers" },
+    { "id": "tx", "label": "JTA transaction" },
+    { "id": "outbox", "label": "outbox table" },
+    { "id": "worker", "label": "apps/worker" },
+    { "id": "broker", "label": "Delivery" }
+  ],
+  "phases": [
+    { "id": "enqueue", "label": "Enqueue", "fromCol": 0, "toCol": 1 },
+    { "id": "drain", "label": "Drain", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "settle", "label": "Deliver + settle", "fromCol": 4, "toCol": 5 }
+  ],
+  "mainPath": [
+    "emit",
+    "append",
+    "row",
+    "claim",
+    "send",
+    "broker",
+    "consume"
+  ],
+  "nodes": [
+    {
+      "id": "emit",
+      "lane": "producers",
+      "col": 0,
+      "type": "backend",
+      "label": "Use case",
+      "sublabel": "ArchiveWidget.archive"
+    },
+    {
+      "id": "append",
+      "lane": "tx",
+      "col": 1,
+      "type": "backend",
+      "label": "@Transactional",
+      "sublabel": "one local JTA transaction"
+    },
+    {
+      "id": "row",
+      "lane": "outbox",
+      "col": 1,
+      "type": "database",
+      "label": "outbox row",
+      "sublabel": "tenant_id · unique idempotency_key"
+    },
+    {
+      "id": "claim",
+      "lane": "worker",
+      "col": 2,
+      "type": "backend",
+      "label": "Poll due rows",
+      "sublabel": "FOR UPDATE SKIP LOCKED"
+    },
+    {
+      "id": "send",
+      "lane": "worker",
+      "col": 3,
+      "type": "backend",
+      "label": "Publish",
+      "sublabel": "JMS or HTTP · correlationId"
+    },
+    {
+      "id": "broker",
+      "lane": "broker",
+      "col": 4,
+      "type": "messagebus",
+      "label": "JMS broker",
+      "sublabel": "at-least-once delivery"
+    },
+    {
+      "id": "consume",
+      "lane": "broker",
+      "col": 5,
+      "type": "backend",
+      "label": "Consumer",
+      "sublabel": "idempotent · dedupe by key"
+    },
+    {
+      "id": "dlq",
+      "lane": "outbox",
+      "col": 5,
+      "type": "database",
+      "label": "dead-letter row",
+      "sublabel": "visible to admins"
+    }
+  ],
+  "edges": [
+    {
+      "id": "o1",
+      "from": "emit",
+      "to": "append"
+    },
+    {
+      "id": "o2",
+      "from": "append",
+      "to": "row",
+      "label": "outbox.append"
+    },
+    {
+      "id": "o3",
+      "from": "row",
+      "to": "claim",
+      "label": "due rows"
+    },
+    {
+      "id": "o4",
+      "from": "claim",
+      "to": "send"
+    },
+    {
+      "id": "o5",
+      "from": "send",
+      "to": "broker",
+      "label": "publish"
+    },
+    {
+      "id": "o6",
+      "from": "broker",
+      "to": "consume",
+      "label": "at-least-once"
+    },
+    {
+      "id": "o7",
+      "from": "claim",
+      "to": "dlq",
+      "label": "max attempts",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "o8",
+      "from": "send",
+      "to": "claim",
+      "label": "failed → backoff → retry",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One transaction, one effect",
+      "items": [
+        "the domain row and the outbox row commit together in the same JTA transaction — a separate commit for the event loses it, and that lost effect is the bug the pattern exists to remove",
+        "the use case owns the transaction: @Transactional on the use-case entry method, never on a resource or a repository; JpaOutbox.persist joins the same EntityManager as the domain write",
+        "there is no XA and no distributed transaction: a remote effect is an idempotent async job, and the outbox row is its courier"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The drain is a bounded job",
+      "items": [
+        "the worker polls the due rows with FOR UPDATE SKIP LOCKED, publishes through JMS or HTTP, then marks the row sent — a claimed row is never handed to two workers at once",
+        "every job is bounded: batch size, time budget, backoff and a dead-letter; a long operation creates a run row and answers 202 instead of holding the request thread",
+        "timers come from @Schedule or ManagedScheduledExecutorService — never new Thread or Executors inside a managed server; the worker is the apps/worker composition root, not a thread in the API"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "At-least-once means idempotent",
+      "items": [
+        "JMS delivery is at-least-once, so every consumer is idempotent: the message carries tenantId, correlationId and an idempotency key, and the consumer deduplicates by that key",
+        "the schema backs it up — outbox.idempotency_key is NOT NULL and UNIQUE, and the outbox row also carries tenant_id so the drain stays inside one tenant",
+        "a dead-letter row is visible to admins instead of disappearing; outbox idempotency and the two-tenant test are release blockers, and a retry keeps the same key so a replay is a no-op"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "beautiful-j2ee — Services & Slices",
+    "quality_profile": "showcase",
+    "output": "services-slices.architecture.html"
+  },
+  "components": [
+    {
+      "id": "apps-api",
+      "type": "backend",
+      "label": "apps/api",
+      "sublabel": "composition root · CDI producers",
+      "pos": [
+        30,
+        40
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "apps-worker",
+      "type": "backend",
+      "label": "apps/worker",
+      "sublabel": "composition root · listener",
+      "pos": [
+        30,
+        220
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "presentation",
+      "type": "backend",
+      "label": "presentation",
+      "sublabel": "JAX-RS resources · DTO records",
+      "pos": [
+        280,
+        40
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "application",
+      "type": "backend",
+      "label": "application",
+      "sublabel": "use case · @Transactional",
+      "pos": [
+        560,
+        40
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "domain",
+      "type": "backend",
+      "label": "domain",
+      "sublabel": "entities · rules · plain Java",
+      "pos": [
+        840,
+        40
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "contracts",
+      "type": "backend",
+      "label": "contracts",
+      "sublabel": "published API + event types",
+      "pos": [
+        560,
+        220
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "adapters",
+      "type": "backend",
+      "label": "adapters",
+      "sublabel": "JPA · JMS · HTTP client · cache",
+      "pos": [
+        840,
+        220
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "kernel",
+      "type": "backend",
+      "label": "shared",
+      "sublabel": "Result · AppError · TenantId · Clock",
+      "pos": [
+        280,
+        400
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "schema per slice · tenant_id + RLS",
+      "pos": [
+        840,
+        400
+      ],
+      "size": [
+        170,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Composition roots — apps/api, apps/worker",
+      "wraps": [
+        "apps-api",
+        "apps-worker"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "features/<slice> — the module graph IS the architecture",
+      "wraps": [
+        "presentation",
+        "application",
+        "domain",
+        "contracts",
+        "adapters"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Shared kernel — plain Java, no jakarta.*",
+      "wraps": [
+        "kernel"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "State — one schema per slice, no cross-slice FK",
+      "wraps": [
+        "pg"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "s1",
+      "from": "apps-api",
+      "to": "presentation",
+      "label": "CDI beans"
+    },
+    {
+      "id": "s2",
+      "from": "apps-worker",
+      "to": "application",
+      "label": "same use case"
+    },
+    {
+      "id": "s3",
+      "from": "presentation",
+      "to": "application",
+      "label": "one use case"
+    },
+    {
+      "id": "s4",
+      "from": "application",
+      "to": "domain",
+      "label": "entities"
+    },
+    {
+      "id": "s5",
+      "from": "application",
+      "to": "adapters",
+      "label": "implements the port"
+    },
+    {
+      "id": "s6",
+      "from": "domain",
+      "to": "adapters",
+      "label": "entity mapping"
+    },
+    {
+      "id": "s7",
+      "from": "application",
+      "to": "contracts",
+      "label": "events"
+    },
+    {
+      "id": "s8",
+      "from": "adapters",
+      "to": "pg",
+      "label": "EntityManager"
+    },
+    {
+      "id": "s9",
+      "from": "application",
+      "to": "kernel",
+      "label": "Result · AppError"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The module dependency rule",
+      "items": [
+        "a module's pom.xml dependencies are the complete list of what it may import — a forbidden artifact fails Enforcer and compilation, and a domain module compiles with the plain maven-compiler-plugin, not a jakarta.* dependency",
+        "domain is plain Java: entities, value objects, rules and ports, with no jakarta.*, no JPA, no JAX-RS, no server API; presentation must not depend on adapters or JPA",
+        "one slice never imports another slice's entities, repositories or tables; a cross-slice read goes through the other slice's contracts and a port"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Ports and the composition root",
+      "items": [
+        "the ports are named: WidgetRepository, Outbox, SessionStore, Clock, Notifier, TokenVerifier, PermissionChecker — a port uses domain types, so no EntityManager, HttpServletRequest or JMS type crosses into the domain",
+        "apps/api and apps/worker build the CDI graph; a producer returns the port type, not the implementation; the use case receives its ports through the constructor — no field injection, no service locator",
+        "tests build the same graph with fakes and the use case never changes: JUnit 5 for the use case, Weld SE for CDI, Testcontainers for PostgreSQL and Artemis"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Transactions and identity",
+      "items": [
+        "the use case owns the JTA transaction and the resource and the repository never open one; the outbox row commits with the domain row; there is no XA — a distributed effect is an idempotent async job",
+        "@Version on every mutable aggregate: a conflict is a typed error mapped to 409, never a 500; expected failures are Result values, not exceptions",
+        "JPA entities live in adapters and never cross the API — the edge returns DTO records with Bean Validation, and one ExceptionMapper per error family maps to 401/403/404/409/422/429/5xx"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "How the walls are enforced",
+      "items": [
+        "Maven Enforcer and ArchUnit police the module graph; the Checkstyle config and the SpotBugs exclude file in lints/ police the code — the config wins when it and the prose disagree, and the prose is fixed",
+        "CI check.yml runs the skill validator, the Java-example balance gate, the unittest suite, and on a JDK the javac self-check plus the Checkstyle violation harness; lints/check/Clean.java must stay quiet while Violations.java keeps its deliberate findings",
+        "the contract is unbreakable and non-waivable: when a rule fires, re-cut the layout — never weaken, rename or delete the rule, and never silence it with a module-wide suppression; a config exception is a contract change"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "beautiful-j2ee — Auth / trust sequence",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "token",
+        "label": "Token",
+        "focus": [
+          "client",
+          "api",
+          "sec"
+        ],
+        "note": "the container validates the bearer token; the tenant arrives as a validated claim"
+      },
+      {
+        "id": "tx",
+        "label": "Transaction",
+        "focus": [
+          "api",
+          "usecase",
+          "pg"
+        ],
+        "note": "the use case owns the JTA transaction; the tenant predicate and the RLS policy both apply"
+      },
+      {
+        "id": "response",
+        "label": "Response",
+        "focus": [
+          "api",
+          "client"
+        ],
+        "note": "a DTO record crosses the API — never the entity"
+      }
+    ],
+    "output": "auth-sequence.sequence.html"
+  },
+  "participants": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sublabel": "SPA · CLI"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "apps/api",
+      "sublabel": "JAX-RS resource"
+    },
+    {
+      "id": "sec",
+      "type": "security",
+      "label": "Jakarta Security",
+      "sublabel": "MP JWT · @RolesAllowed"
+    },
+    {
+      "id": "usecase",
+      "type": "backend",
+      "label": "Use case",
+      "sublabel": "@Transactional · ports"
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "tenant_id · RLS"
+    }
+  ],
+  "segments": [
+    {
+      "from": 146,
+      "to": 236,
+      "label": "Validate the token"
+    },
+    {
+      "from": 246,
+      "to": 404,
+      "label": "The use case owns the transaction"
+    },
+    {
+      "from": 414,
+      "to": 474,
+      "label": "Map the Result"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "from": "client",
+      "to": "api",
+      "y": 164,
+      "label": "POST /widgets/{id}/archive — Bearer JWT",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m2",
+      "from": "api",
+      "to": "sec",
+      "y": 196,
+      "label": "validate token (JWKS · exp · iss)"
+    },
+    {
+      "id": "m3",
+      "from": "sec",
+      "to": "api",
+      "y": 228,
+      "label": "principal + tenant claim",
+      "variant": "return"
+    },
+    {
+      "id": "m4",
+      "from": "api",
+      "to": "usecase",
+      "y": 264,
+      "label": "archive(tenant, id, version, key)"
+    },
+    {
+      "id": "m5",
+      "from": "usecase",
+      "to": "pg",
+      "y": 300,
+      "label": "SET app.tenant_id · SELECT … WHERE id AND tenant_id"
+    },
+    {
+      "id": "m6",
+      "from": "pg",
+      "to": "usecase",
+      "y": 332,
+      "label": "the widget row",
+      "variant": "return"
+    },
+    {
+      "id": "m7",
+      "from": "usecase",
+      "to": "pg",
+      "y": 364,
+      "label": "UPDATE widgets · @Version check"
+    },
+    {
+      "id": "m8",
+      "from": "pg",
+      "to": "usecase",
+      "y": 396,
+      "label": "committed",
+      "variant": "return"
+    },
+    {
+      "id": "m9",
+      "from": "usecase",
+      "to": "api",
+      "y": 428,
+      "label": "Result<Widget>",
+      "variant": "return"
+    },
+    {
+      "id": "m10",
+      "from": "api",
+      "to": "client",
+      "y": 460,
+      "label": "200 + DTO record | 403 | 404 | 409",
+      "variant": "emphasis"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 158,
+      "to": 466,
+      "type": "backend"
+    },
+    {
+      "participant": "sec",
+      "from": 190,
+      "to": 234,
+      "type": "security"
+    },
+    {
+      "participant": "usecase",
+      "from": 258,
+      "to": 402,
+      "type": "backend"
+    },
+    {
+      "participant": "pg",
+      "from": 294,
+      "to": 338,
+      "type": "database"
+    },
+    {
+      "participant": "pg",
+      "from": 358,
+      "to": 402,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The edge stays thin",
+      "items": [
+        "the resource parses, validates, calls one use case and maps the Result — no business rule, no EntityManager, no @Transactional on the resource",
+        "the tenant arrives as a value (a TenantId), not as a SecurityContext the use case could read; a use case never sees HttpServletRequest, SecurityContext or a JMSContext",
+        "the tenant comes from the validated token — never from a query string and never from an unverified header"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Two lines of defence",
+      "items": [
+        "the use case checks permission and ownership before the write and returns AppError.forbidden — the URL and the roles only shape the UX",
+        "the adapter sets app.tenant_id on the transaction before the first query, and the RLS policy with a non-bypass application role filters again",
+        "a missing predicate yields zero rows, never a cross-tenant read; the two-tenant test is a release blocker"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "The response",
+      "items": [
+        "a DTO record crosses the API, never the JPA entity: no lazy proxy, no over-posting, no internal id",
+        "the envelope is { \"error\": { code, message, requiredPermission, correlationId } }; one ExceptionMapper per family maps to 401/403/404/409/422/429/5xx",
+        "a version mismatch is a typed conflict (409), not a 500 — and a stack trace, SQL text or an internal id never leaves the server"
+      ]
+    }
+  ]
+}

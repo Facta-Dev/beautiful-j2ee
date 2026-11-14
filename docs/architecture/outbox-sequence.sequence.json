@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "beautiful-j2ee — Outbox / async-delivery sequence",
+    "quality_profile": "showcase",
+    "output": "outbox-sequence.sequence.html"
+  },
+  "participants": [
+    {
+      "id": "usecase",
+      "type": "backend",
+      "label": "Use case",
+      "sublabel": "@Transactional"
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "widgets + outbox"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "apps/worker",
+      "sublabel": "outbox drain"
+    },
+    {
+      "id": "broker",
+      "type": "messagebus",
+      "label": "JMS broker",
+      "sublabel": "Artemis"
+    },
+    {
+      "id": "consumer",
+      "type": "backend",
+      "label": "Consumer",
+      "sublabel": "idempotent"
+    }
+  ],
+  "segments": [
+    {
+      "from": 146,
+      "to": 210,
+      "label": "Commit together"
+    },
+    {
+      "from": 220,
+      "to": 380,
+      "label": "Drain and settle"
+    },
+    {
+      "from": 388,
+      "to": 478,
+      "label": "Deliver and dedupe"
+    }
+  ],
+  "messages": [
+    {
+      "id": "q1",
+      "from": "usecase",
+      "to": "pg",
+      "y": 164,
+      "label": "INSERT widgets + INSERT outbox (one JTA tx)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "q2",
+      "from": "pg",
+      "to": "usecase",
+      "y": 196,
+      "label": "committed — the effect is durable",
+      "variant": "return"
+    },
+    {
+      "id": "q3",
+      "from": "worker",
+      "to": "pg",
+      "y": 232,
+      "label": "SELECT due rows FOR UPDATE SKIP LOCKED"
+    },
+    {
+      "id": "q4",
+      "from": "pg",
+      "to": "worker",
+      "y": 264,
+      "label": "claimed batch",
+      "variant": "return"
+    },
+    {
+      "id": "q5",
+      "from": "worker",
+      "to": "broker",
+      "y": 296,
+      "label": "publish widget.archived (tenantId · correlationId · key)"
+    },
+    {
+      "id": "q6",
+      "from": "broker",
+      "to": "worker",
+      "y": 328,
+      "label": "ack",
+      "variant": "return"
+    },
+    {
+      "id": "q7",
+      "from": "worker",
+      "to": "pg",
+      "y": 360,
+      "label": "UPDATE outbox SET sent_at …"
+    },
+    {
+      "id": "q8",
+      "from": "broker",
+      "to": "consumer",
+      "y": 396,
+      "label": "delivery (at-least-once)",
+      "variant": "dashed"
+    },
+    {
+      "id": "q9",
+      "from": "consumer",
+      "to": "broker",
+      "y": 428,
+      "label": "ack",
+      "variant": "return"
+    },
+    {
+      "id": "q10",
+      "from": "consumer",
+      "to": "pg",
+      "y": 460,
+      "label": "dedupe by idempotency key"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "usecase",
+      "from": 158,
+      "to": 202,
+      "type": "backend"
+    },
+    {
+      "participant": "pg",
+      "from": 162,
+      "to": 202,
+      "type": "database"
+    },
+    {
+      "participant": "worker",
+      "from": 226,
+      "to": 372,
+      "type": "backend"
+    },
+    {
+      "participant": "pg",
+      "from": 228,
+      "to": 270,
+      "type": "database"
+    },
+    {
+      "participant": "broker",
+      "from": 290,
+      "to": 334,
+      "type": "messagebus"
+    },
+    {
+      "participant": "pg",
+      "from": 354,
+      "to": 372,
+      "type": "database"
+    },
+    {
+      "participant": "broker",
+      "from": 390,
+      "to": 434,
+      "type": "messagebus"
+    },
+    {
+      "participant": "consumer",
+      "from": 390,
+      "to": 466,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Commit together",
+      "items": [
+        "the domain row and the outbox row commit in the same JTA transaction — the outbox row is the courier, so there is no dual-write gap to lose an event in",
+        "the use case owns that transaction: @Transactional on the entry method, never on the resource or the repository; the outbox adapter joins the same EntityManager",
+        "the row carries tenant_id, the event type, the payload, the idempotency key and created_at — so a drain never crosses a tenant"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Claim, publish, settle",
+      "items": [
+        "the worker claims the due rows with FOR UPDATE SKIP LOCKED — a row is never handed to two workers at once, and no lease has to be tuned",
+        "after the publish succeeds the row is marked sent; a failure keeps it due, backs off with jitter and, at max attempts, becomes a dead-letter row an admin can see",
+        "the job is bounded — batch size, time budget, backoff, dead-letter — and runs under @Schedule or ManagedScheduledExecutorService, never a raw thread"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "At-least-once, on purpose",
+      "items": [
+        "JMS delivers at-least-once, so the consumer is idempotent: it deduplicates by the idempotency key, which the schema also keeps UNIQUE on outbox",
+        "the message carries tenantId, correlationId and the idempotency key, so the effect can be traced from the HTTP request through the outbox row to the consumer",
+        "a replay is a no-op, not a duplicate effect — the same guarantee the use case gives the caller when it replays an Idempotency-Key"
+      ]
+    }
+  ]
+}

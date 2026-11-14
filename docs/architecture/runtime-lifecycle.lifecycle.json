@@ -1,0 +1,189 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "beautiful-j2ee — Runtime lifecycle",
+    "quality_profile": "showcase",
+    "output": "runtime-lifecycle.lifecycle.html"
+  },
+  "mainPath": [
+    "boot",
+    "wire",
+    "deploy",
+    "serve",
+    "request"
+  ],
+  "states": [
+    {
+      "id": "boot",
+      "type": "start",
+      "label": "Boot",
+      "sublabel": "config ordinals 400>300>100",
+      "step": "01",
+      "tag": "entry"
+    },
+    {
+      "id": "wire",
+      "type": "active",
+      "label": "CDI composition",
+      "sublabel": "apps/api · apps/worker",
+      "step": "02"
+    },
+    {
+      "id": "deploy",
+      "type": "decision",
+      "label": "Migrate + deploy",
+      "sublabel": "Flyway · stateless nodes",
+      "step": "03",
+      "tag": "gate"
+    },
+    {
+      "id": "serve",
+      "type": "active",
+      "label": "Serve",
+      "sublabel": "JAX-RS · MP Health",
+      "step": "04"
+    },
+    {
+      "id": "request",
+      "type": "success",
+      "label": "Request served",
+      "sublabel": "use case tx · DTO",
+      "step": "05",
+      "tag": "done"
+    },
+    {
+      "id": "exitfail",
+      "type": "failure",
+      "label": "Exit 1",
+      "sublabel": "fail-closed boot",
+      "tag": "terminal"
+    },
+    {
+      "id": "drift",
+      "type": "failure",
+      "label": "Rollout aborted",
+      "sublabel": "migration failed",
+      "tag": "terminal"
+    },
+    {
+      "id": "unhealthy",
+      "type": "failure",
+      "label": "503 degraded",
+      "sublabel": "readiness fails",
+      "tag": "terminal"
+    },
+    {
+      "id": "denied",
+      "type": "waiting",
+      "label": "403 FORBIDDEN",
+      "sublabel": "no permission",
+      "tag": "pause"
+    },
+    {
+      "id": "drain",
+      "type": "active",
+      "label": "Outbox drain",
+      "sublabel": "settles in-flight rows",
+      "tag": "automatic"
+    },
+    {
+      "id": "drained",
+      "type": "success",
+      "label": "Settled",
+      "sublabel": "sent · dead-letter",
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t1",
+      "from": "boot",
+      "to": "wire"
+    },
+    {
+      "id": "t2",
+      "from": "wire",
+      "to": "deploy"
+    },
+    {
+      "id": "t3",
+      "from": "deploy",
+      "to": "serve"
+    },
+    {
+      "id": "t4",
+      "from": "serve",
+      "to": "request"
+    },
+    {
+      "id": "t5",
+      "from": "boot",
+      "to": "exitfail",
+      "label": "missing key",
+      "variant": "dashed"
+    },
+    {
+      "id": "t6",
+      "from": "deploy",
+      "to": "drift",
+      "label": "migration failed",
+      "variant": "dashed"
+    },
+    {
+      "id": "t7",
+      "from": "serve",
+      "to": "unhealthy",
+      "label": "database down",
+      "variant": "dashed"
+    },
+    {
+      "id": "t8",
+      "from": "request",
+      "to": "denied",
+      "label": "not permitted",
+      "variant": "security"
+    },
+    {
+      "id": "t9",
+      "from": "request",
+      "to": "drain",
+      "label": "async effect queued"
+    },
+    {
+      "id": "t10",
+      "from": "drain",
+      "to": "drained",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The boot rail",
+      "items": [
+        "MicroProfile Config ordinals decide the winner: system properties 400 > environment 300 > microprofile-config.properties 100 — an env-first policy needs a custom ConfigSource, it does not happen by default",
+        "secrets come from a vault or a Kubernetes Secret, never from the properties file, persistence.xml, the logs or the image; a missing required key fails the boot fast",
+        "the composition root builds the CDI graph — constructor injection, producers returning port types, no field injection and no service locator in business code"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Deploy is a step, not a startup",
+      "items": [
+        "Flyway or Liquibase runs as an init job before the rollout — never on application start, where two replicas would race the same migration",
+        "server configuration is code (image, Helm, Ansible), never an admin console; the nodes are stateless and the rolling deploy gates on readiness",
+        "expand/contract migrations and a tested rollback: the built WAR or EAR starts on the target server, not only in the unit suite"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Health, metrics, shutdown",
+      "items": [
+        "MicroProfile Health exposes readiness and liveness; the readiness gate is what the rolling deploy waits on, and a failing database answers 503 instead of serving broken traffic",
+        "Metrics cover latency, errors, queue depth and age, outbox and DLQ counts and pool saturation; OpenTelemetry traces carry the correlationId from HTTP through JMS and the outbox",
+        "structured logs carry tenantId, slice and use case — never a token or PII; on SIGTERM the in-flight requests drain and the worker settles its outbox rows"
+      ]
+    }
+  ]
+}

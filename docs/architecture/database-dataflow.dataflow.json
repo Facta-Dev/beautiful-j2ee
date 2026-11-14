@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "beautiful-j2ee — Data / state flow",
+    "quality_profile": "showcase",
+    "output": "database-dataflow.dataflow.html"
+  },
+  "stages": [
+    { "label": "Clients" },
+    { "label": "Use case" },
+    { "label": "PostgreSQL" },
+    { "label": "apps/worker" },
+    { "label": "Delivery" }
+  ],
+  "nodes": [
+    {
+      "id": "client",
+      "type": "frontend",
+      "label": "API client",
+      "sublabel": "bearer JWT",
+      "stage": 0,
+      "row": 0
+    },
+    {
+      "id": "oidc",
+      "type": "external",
+      "label": "OIDC issuer",
+      "sublabel": "token · JWKS",
+      "stage": 0,
+      "row": 2
+    },
+    {
+      "id": "usecase",
+      "type": "backend",
+      "label": "Use case",
+      "sublabel": "tenant scope · @Transactional",
+      "stage": 1,
+      "row": 1,
+      "width": 170
+    },
+    {
+      "id": "widgets",
+      "type": "database",
+      "label": "widgets",
+      "sublabel": "tenant_id · @Version",
+      "stage": 2,
+      "row": 0,
+      "width": 150
+    },
+    {
+      "id": "outbox",
+      "type": "database",
+      "label": "outbox",
+      "sublabel": "unique idempotency_key",
+      "stage": 2,
+      "row": 2,
+      "width": 160,
+      "tag": "outbox"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "apps/worker",
+      "sublabel": "poll · publish · settle",
+      "stage": 3,
+      "row": 1,
+      "width": 150
+    },
+    {
+      "id": "broker",
+      "type": "messagebus",
+      "label": "JMS broker",
+      "sublabel": "at-least-once",
+      "stage": 4,
+      "row": 2,
+      "width": 130
+    }
+  ],
+  "flows": [
+    {
+      "id": "df1",
+      "from": "client",
+      "to": "usecase",
+      "label": "REST + bearer"
+    },
+    {
+      "id": "df2",
+      "from": "oidc",
+      "to": "usecase",
+      "label": "validated claims",
+      "variant": "dashed"
+    },
+    {
+      "id": "df3",
+      "from": "usecase",
+      "to": "widgets",
+      "label": "tenant predicate"
+    },
+    {
+      "id": "df4",
+      "from": "usecase",
+      "to": "outbox",
+      "label": "same JTA tx",
+      "variant": "emphasis",
+      "labelDy": 30
+    },
+    {
+      "id": "df5",
+      "from": "outbox",
+      "to": "worker",
+      "label": "due rows"
+    },
+    {
+      "id": "df6",
+      "from": "worker",
+      "to": "broker",
+      "label": "publish",
+      "route": "straight"
+    },
+    {
+      "id": "df7",
+      "from": "worker",
+      "to": "outbox",
+      "label": "sent · backoff",
+      "variant": "dashed",
+      "route": "bottom-channel"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Schema discipline",
+      "items": [
+        "tenant_id NOT NULL on every table, first column of every index and first term of every predicate, next to the standard columns id, created_at, updated_at, version, deleted_at",
+        "one schema per slice and no cross-slice foreign key or join — a cross-slice read goes through the other slice's contracts and a port",
+        "Flyway is the only schema authority and hbm2ddl.auto=validate in every deployed profile; migrations are a deploy step, never a startup task"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The write path",
+      "items": [
+        "the domain row and the outbox row commit in one JTA transaction, so there is no window where the state changed and the event did not",
+        "the adapter sets app.tenant_id on the transaction before the first query and maps the entity to the domain at the repository boundary; no lazy proxy leaves the transaction",
+        "the JPA entity stays inside the adapter — the API receives a DTO record, and the use case sees a plain domain object"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Delivery and the second line",
+      "items": [
+        "the worker claims the due rows with FOR UPDATE SKIP LOCKED, publishes and settles them; a failure backs off and ends in a dead-letter row an admin can see",
+        "the consumer deduplicates by the idempotency key because JMS delivers at-least-once; the key is UNIQUE in the schema, so a replay is a no-op",
+        "the RLS policy with a non-bypass application role filters again what the tenant predicate already selected — the database is the second line, never the first"
+      ]
+    }
+  ]
+}

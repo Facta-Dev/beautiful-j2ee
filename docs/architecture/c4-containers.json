@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "beautiful-j2ee — Container Architecture",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "all",
+        "label": "All",
+        "focus": [
+          "clients",
+          "oidc",
+          "server",
+          "api",
+          "worker",
+          "pg",
+          "artemis"
+        ],
+        "note": "The Jakarta EE 11 target this repo's skills contract builds: apps/api and apps/worker, one tenant-isolated database, one broker."
+      },
+      {
+        "id": "request",
+        "label": "Request",
+        "focus": [
+          "clients",
+          "server",
+          "api",
+          "pg"
+        ],
+        "note": "One request, one JTA transaction: the use case owns it, the outbox row commits with the domain row."
+      },
+      {
+        "id": "async",
+        "label": "Async",
+        "focus": [
+          "api",
+          "worker",
+          "pg",
+          "artemis"
+        ],
+        "note": "The outbox is the courier: the worker drains due rows, publishes, settles, and every consumer is idempotent."
+      },
+      {
+        "id": "trust",
+        "label": "Trust",
+        "focus": [
+          "clients",
+          "oidc",
+          "api",
+          "pg"
+        ],
+        "note": "The tenant comes from the validated token; the schema's tenant_id plus RLS is the second line, not the first."
+      }
+    ],
+    "output": "c4-containers.html"
+  },
+  "components": [
+    {
+      "id": "oidc",
+      "type": "external",
+      "label": "OIDC / JWT issuer",
+      "sublabel": "MP JWT · JWKS",
+      "pos": [
+        30,
+        110
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "clients",
+      "type": "external",
+      "label": "API clients",
+      "sublabel": "SPA · CLI · partner",
+      "pos": [
+        30,
+        240
+      ],
+      "size": [
+        120,
+        60
+      ]
+    },
+    {
+      "id": "server",
+      "type": "cloud",
+      "label": "Application server",
+      "sublabel": "WildFly · Payara · Liberty",
+      "pos": [
+        230,
+        240
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "apps/api",
+      "sublabel": "JAX-RS · CDI · MP Health",
+      "pos": [
+        450,
+        240
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "apps/worker",
+      "sublabel": "outbox drain · MDB listener",
+      "pos": [
+        690,
+        240
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "schema per slice · tenant RLS",
+      "pos": [
+        690,
+        400
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "artemis",
+      "type": "messagebus",
+      "label": "JMS broker",
+      "sublabel": "Artemis · at-least-once",
+      "pos": [
+        960,
+        240
+      ],
+      "size": [
+        150,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Jakarta EE runtime — WildFly / Payara / Open Liberty",
+      "wraps": [
+        "server",
+        "api",
+        "worker"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "State plane — the only persistence boundary",
+      "wraps": [
+        "pg"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Messaging — JMS 3.1, delivery at-least-once",
+      "wraps": [
+        "artemis"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "k1",
+      "from": "clients",
+      "to": "server",
+      "label": "HTTPS · TLS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "k2",
+      "from": "server",
+      "to": "api",
+      "label": "JAX-RS /api/v1"
+    },
+    {
+      "id": "k3",
+      "from": "api",
+      "to": "pg",
+      "label": "JPA · JTA · tenant RLS",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "k4",
+      "from": "worker",
+      "to": "pg",
+      "label": "outbox drain · FOR UPDATE SKIP LOCKED",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "k5",
+      "from": "worker",
+      "to": "artemis",
+      "label": "JMS publish",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "k6",
+      "from": "oidc",
+      "to": "api",
+      "label": "JWKS · token validation",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "What this repo ships",
+      "items": [
+        "this repository ships the contract, not a running service: three Agent Skills (j2ee-best-practices, j2ee-review, j2ee-port) plus a drop-in Checkstyle config in lints/",
+        "the skills carry the digests (references/jakarta-ee.md, j2ee-architecture.md, j2ee-patterns.md) that the diagram above describes; the Java template under src/main/java/com/example/app/ is the worked example of the same contract",
+        "the machine half is CI: check.yml runs the skill validator, the Java-example balance gate, the unittest suite, and — on Ubuntu with a JDK — javac + the self-check plus the Checkstyle violation harness"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The runtime contract",
+      "items": [
+        "apps/api and apps/worker are the only composition roots: CDI producers return the port type, never the implementation, and business code never reaches for a BeanManager",
+        "the use case owns the JTA transaction — not the resource, not the repository — so a failure leaves no partial effect; there is no XA, a distributed effect is an idempotent async job",
+        "JPA entities live in adapters and never cross the API: the edge returns DTO records, and the error envelope is {error:{code,message,requiredPermission,correlationId}} with one ExceptionMapper per family"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Tenant isolation, twice",
+      "items": [
+        "tenant_id NOT NULL on every table, first in every index and first in every predicate; the use case checks permission and ownership before the write",
+        "the database is the second line: PostgreSQL row-level security with a dedicated non-bypass application role, app.tenant_id set per transaction by the adapter, migrations under a separate owner role",
+        "a two-tenant test — a query without the predicate returns zero rows, a cross-tenant write fails — is a release blocker, not a nice-to-have"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "The async path",
+      "items": [
+        "the outbox row and the domain row commit in one JTA transaction; a separate commit for the event loses it",
+        "the worker polls due rows with FOR UPDATE SKIP LOCKED, publishes through JMS or HTTP, and marks the row sent; a bounded job carries a batch size, a time budget, a backoff and a dead-letter row",
+        "JMS is at-least-once, so every consumer is idempotent and deduplicates by the idempotency key; the message carries tenantId, correlationId and the key"
+      ]
+    }
+  ]
+}

@@ -143,6 +143,23 @@ The unbreakable rules:
    second line.
 7. Every async effect is idempotent.
 
+## Architecture diagrams
+
+The repo ships eight [Archify](https://github.com/tt-a1i/archify) diagrams under
+[`docs/architecture/`](docs/architecture/README.md), each a standalone HTML page
+you can open, pan and zoom in a browser.
+
+| Diagram | Type | Shows |
+|---|---|---|
+| [c4-containers](docs/architecture/c4-containers.html) | architecture | `apps/api` and `apps/worker` on a Jakarta EE server, PostgreSQL with tenant RLS, the JMS broker, the OIDC issuer |
+| [services-slices](docs/architecture/services-slices.architecture.html) | architecture | the `features/<slice>` module graph and the dependency walls it enforces |
+| [auth-algorithm](docs/architecture/auth-algorithm.workflow.html) | workflow | token validation → tenant claim → permission and ownership → RLS → write → audit |
+| [outbox-algorithm](docs/architecture/outbox-algorithm.workflow.html) | workflow | the transactional outbox: commit together, claim, publish, settle, dead-letter |
+| [auth-sequence](docs/architecture/auth-sequence.sequence.html) | sequence | one request from the client to PostgreSQL and back |
+| [outbox-sequence](docs/architecture/outbox-sequence.sequence.html) | sequence | the outbox drain and the at-least-once delivery |
+| [database-dataflow](docs/architecture/database-dataflow.dataflow.html) | dataflow | where the state goes: tenant tables, the outbox row, the broker |
+| [runtime-lifecycle](docs/architecture/runtime-lifecycle.lifecycle.html) | lifecycle | boot → composition → migrations → serve → request, with the fail-closed endings |
+
 ## The lints config
 
 [`lints/checkstyle.xml`](lints/checkstyle.xml) is a copy-in Checkstyle config:
@@ -180,6 +197,9 @@ skills/
                         architecture, strict Java)
   j2ee-review/          SKILL.md (report format, ranking, waived gates)
   j2ee-port/            SKILL.md (Spring/Java EE 8/EJB/JSF → Jakarta EE)
+docs/
+  architecture/         eight Archify diagrams (C4, slices, auth,
+                        outbox, dataflow, lifecycle) + their index
 lints/
   checkstyle.xml        the drop-in rules
   check/                the violation harness + clean control
