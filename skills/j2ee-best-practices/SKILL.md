@@ -15,6 +15,11 @@ description: >-
 
 # J2EE / Jakarta EE best practices
 
+> Playbook set: start with [`PLAYBOOK_MASTER.md`](https://github.com/Facta-Dev/ai-coding-playbook/blob/main/PLAYBOOK_MASTER.md) —
+> the catalog, precedence and cross-playbook invariants — then
+> [`PLAYBOOK_JAVA_J2EE.md`](https://github.com/Facta-Dev/ai-coding-playbook/blob/main/PLAYBOOK_JAVA_J2EE.md). This skill is the runnable companion of that
+> contract.
+
 Distilled from the Jakarta EE 11 specification, the Jakarta/MicroProfile
 guides, and the facta J2EE handbook (`PLAYBOOK_JAVA_J2EE.md`). The digests live
 in `references/`; where sources disagree, this file says which to follow and
